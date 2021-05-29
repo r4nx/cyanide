@@ -33,7 +33,7 @@ namespace Detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function(hook->callback_),
+                std::function{hook->callback_},
                 std::move(args)...);
         }
     };
@@ -49,7 +49,7 @@ namespace Detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function(hook->callback_),
+                std::function{hook->callback_},
                 std::move(args)...);
         }
     };
@@ -65,7 +65,7 @@ namespace Detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function(hook->callback_),
+                std::function{hook->callback_},
                 std::move(args)...);
         }
     };
