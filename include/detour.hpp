@@ -6,6 +6,7 @@
 #include <subhook.h>
 #include <xbyak/xbyak.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <utility> // std::move
@@ -104,7 +105,13 @@ public:
     Detour(SourceT source, CallbackT callback)
         : source_{reinterpret_cast<std::uint8_t *>(source)},
           callback_{std::move(callback)}
-    {}
+    {
+        constexpr std::size_t address_size_32_bit = 4;
+
+        static_assert(
+            sizeof(std::size_t) == address_size_32_bit,
+            "Only 32-bit builds are supported");
+    }
 
     void install()
     {
