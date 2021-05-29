@@ -69,6 +69,29 @@ namespace Detail {
                 std::forward<Args>(args)...);
         }
     };
+
+    template <typename HookPtrT, typename Ret, typename... Args>
+    struct thunk_wrapper<HookPtrT, Ret(__fastcall *)(Args...)> {
+        using SourceT = Ret(__fastcall *)(Args...);
+
+        // fastcall will pop the argument from the stack if it's a struct
+        struct StackArg {
+            HookPtrT arg;
+        };
+
+        static Ret __fastcall func(StackArg stack_arg, Args... args)
+        {
+            HookPtrT hook = stack_arg.arg;
+
+            const auto callable_source =
+                reinterpret_cast<SourceT>(hook->actual_hook_.GetTrampoline());
+
+            return hook->callback_wrapper(
+                callable_source,
+                std::function{hook->callback_},
+                std::forward<Args>(args)...);
+        }
+    };
 } // namespace Detail
 
 template <FunctionPtr SourceT, typename CallbackT>
