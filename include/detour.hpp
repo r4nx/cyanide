@@ -90,6 +90,7 @@ public:
 
         actual_hook_.Install(source_, const_cast<std::uint8_t *>(thunk_));
     }
+
     void uninstall()
     {
         actual_hook_.Remove();
@@ -111,6 +112,32 @@ protected:
         constexpr auto source_conv = function_convention_v<SourceT>;
 
         code_gen_.reset();
+
+        /*
+         * Explaining the speciality of cdecl case
+         *
+         * If we take a general approach (as for other calling conventions) for
+         * cdecl convention, the stack layout will look like this:
+         *
+         * [ orig return address ]  <-- top of the stack
+         * [     hook object     ]
+         * [         arg1        ]
+         * [         arg2        ]
+         * [         argN        ]
+         *
+         * But in cdecl the caller must do the clean up and if we return to the
+         * original address, the clean up won't be done correctly (original code
+         * has no clue about hook object, right?), that's why we can't just
+         * return to the original. Instead, we don't do anything with original
+         * return address and pushing our own one. That's explains why we have
+         * unused `return_addr` parameter in cdecl thunk - original address is
+         * treated as an argument.
+         *
+         * In other conventions the stack is cleaned up by the callee (i.e. the
+         * called function), which is aware of additional "hook object" argument
+         * and will do the clean up correctly and return to the original address
+         * with no troubles.
+         */
 
         if constexpr (source_conv != CallingConv::ccdecl)
             code_gen_.pop(eax);
