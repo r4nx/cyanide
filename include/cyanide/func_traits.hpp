@@ -8,6 +8,8 @@ namespace cyanide::Utils {
 template <typename T>
 concept FunctionPtr = std::is_function_v<std::remove_pointer_t<T>>;
 
+// --------------------------------------------------------
+
 enum class CallingConv { cthiscall, ccdecl, cstdcall, cfastcall };
 
 template <typename>
@@ -41,6 +43,20 @@ struct function_convention<Ret(__fastcall *)(Args...)> {
 
 template <typename Func>
 constexpr CallingConv function_convention_v = function_convention<Func>::value;
+
+// --------------------------------------------------------
+
+template <typename>
+struct method_to_func {
+};
+
+template <typename Ret, typename Class, typename... Args>
+struct method_to_func<Ret (Class::*)(Args...)> {
+    using type = Ret(Args...);
+};
+
+template <typename T>
+using method_to_func_t = typename method_to_func<T>::type;
 
 } // namespace cyanide::Utils
 
