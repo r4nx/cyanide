@@ -9,7 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <utility> // std::move
+#include <utility> // std::move, std::forward
 
 namespace cyanide::Hooks {
 
