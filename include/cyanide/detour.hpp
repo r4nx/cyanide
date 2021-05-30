@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <stdexcept>
 #include <utility> // std::move, std::forward
 
 namespace cyanide::Hooks {
@@ -118,12 +119,18 @@ public:
         if (!thunk_)
             thunk_ = make_thunk();
 
-        actual_hook_.Install(source_, const_cast<std::uint8_t *>(thunk_));
+        if (!actual_hook_.Install(source_, const_cast<std::uint8_t *>(thunk_)))
+        {
+            throw std::runtime_error{"Failed to install the hook"};
+        }
     }
 
     void uninstall()
     {
-        actual_hook_.Remove();
+        if (!actual_hook_.Remove())
+        {
+            throw std::runtime_error{"Failed to uninstall the hook"};
+        }
     }
 
 protected:
