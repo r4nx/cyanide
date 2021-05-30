@@ -7,12 +7,6 @@ project(cyanide VERSION 0.1.0
 set(SUBHOOK_STATIC ON CACHE BOOL "" FORCE)
 
 include(FetchContent)
-include(CheckIPOSupported)
-
-check_ipo_supported(RESULT result)
-if(result)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-endif()
 
 FetchContent_Declare(
     subhook
@@ -37,12 +31,9 @@ FetchContent_MakeAvailable(Catch2)
 
 list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 
-if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    include(CTest)
-endif()
-
 add_subdirectory(src)
 
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+    include(CTest)
     add_subdirectory(tests)
 endif()
