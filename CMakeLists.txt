@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17.1)
 
 project(cyanide VERSION 0.1.0
-                DESCRIPTION "Easy to use memory utilities"
+                DESCRIPTION "Useful utilities and wrappers"
                 LANGUAGES CXX)
 
 set(SUBHOOK_STATIC ON CACHE BOOL "" FORCE)
