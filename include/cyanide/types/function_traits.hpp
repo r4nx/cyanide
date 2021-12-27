@@ -1,9 +1,9 @@
-#ifndef CYANIDE_FUNC_TRAITS_HPP_
-#define CYANIDE_FUNC_TRAITS_HPP_
+#ifndef CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
+#define CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
 
 #include <type_traits>
 
-namespace cyanide::Utils {
+namespace cyanide::types {
 
 template <typename T>
 concept FunctionPtr = std::is_function_v<std::remove_pointer_t<T>>;
@@ -58,6 +58,6 @@ struct method_to_func<Ret (Class::*)(Args...)> {
 template <typename T>
 using method_to_func_t = typename method_to_func<T>::type;
 
-} // namespace cyanide::Utils
+} // namespace cyanide::types
 
-#endif // !CYANIDE_FUNC_TRAITS_HPP_
+#endif // !CYANIDE_TYPES_FUNCTION_TRAITS_HPP_

@@ -1,9 +1,8 @@
-#ifndef CYANIDE_DETOUR_HPP_
-#define CYANIDE_DETOUR_HPP_
+#ifndef CYANIDE_HOOKS_FRONTEND_HPP_
+#define CYANIDE_HOOKS_FRONTEND_HPP_
 
-#include "func_traits.hpp"
-
-#include <subhook.h>
+#include <cyanide/misc/defs.hpp>
+#include <cyanide/types/function_traits.hpp>
 #include <xbyak/xbyak.h>
 
 #include <cstddef>
@@ -12,17 +11,15 @@
 #include <stdexcept>
 #include <utility> // std::move, std::forward
 
-namespace cyanide::Hooks {
+namespace cyanide::hooks {
 
-using cyanide::Utils::FunctionPtr;
-
-namespace Detail {
+namespace detail {
     template <typename, typename>
-    struct thunk_wrapper {
+    struct ThunkWrapper {
     };
 
     template <typename HookPtrT, typename Ret, typename... Args>
-    struct thunk_wrapper<HookPtrT, Ret(__cdecl *)(Args...)> {
+    struct ThunkWrapper<HookPtrT, Ret(__cdecl *)(Args...)> {
         using SourceT = Ret(__cdecl *)(Args...);
 
         static Ret __cdecl func(
@@ -30,8 +27,11 @@ namespace Detail {
             std::uintptr_t return_addr,
             Args... args)
         {
+            // See explanation why it's unused below in make_thunk() function
+            static_cast<void>(return_addr);
+
             const auto callable_source =
-                reinterpret_cast<SourceT>(hook->actual_hook_.GetTrampoline());
+                reinterpret_cast<SourceT>(hook->backend_->get_trampoline());
 
             return hook->callback_wrapper(
                 callable_source,
@@ -41,13 +41,13 @@ namespace Detail {
     };
 
     template <typename HookPtrT, typename Ret, typename... Args>
-    struct thunk_wrapper<HookPtrT, Ret(__stdcall *)(Args...)> {
+    struct ThunkWrapper<HookPtrT, Ret(__stdcall *)(Args...)> {
         using SourceT = Ret(__stdcall *)(Args...);
 
         static Ret __stdcall func(HookPtrT hook, Args... args)
         {
             const auto callable_source =
-                reinterpret_cast<SourceT>(hook->actual_hook_.GetTrampoline());
+                reinterpret_cast<SourceT>(hook->backend_->get_trampoline());
 
             return hook->callback_wrapper(
                 callable_source,
@@ -57,13 +57,13 @@ namespace Detail {
     };
 
     template <typename HookPtrT, typename Ret, typename... Args>
-    struct thunk_wrapper<HookPtrT, Ret(__thiscall *)(Args...)> {
+    struct ThunkWrapper<HookPtrT, Ret(__thiscall *)(Args...)> {
         using SourceT = Ret(__thiscall *)(Args...);
 
         static Ret __stdcall func(HookPtrT hook, Args... args)
         {
             const auto callable_source =
-                reinterpret_cast<SourceT>(hook->actual_hook_.GetTrampoline());
+                reinterpret_cast<SourceT>(hook->backend_->get_trampoline());
 
             return hook->callback_wrapper(
                 callable_source,
@@ -73,7 +73,7 @@ namespace Detail {
     };
 
     template <typename HookPtrT, typename Ret, typename... Args>
-    struct thunk_wrapper<HookPtrT, Ret(__fastcall *)(Args...)> {
+    struct ThunkWrapper<HookPtrT, Ret(__fastcall *)(Args...)> {
         using SourceT = Ret(__fastcall *)(Args...);
 
         // fastcall will pop the argument from the stack if it's a struct
@@ -86,7 +86,7 @@ namespace Detail {
             HookPtrT hook = stack_arg.arg;
 
             const auto callable_source =
-                reinterpret_cast<SourceT>(hook->actual_hook_.GetTrampoline());
+                reinterpret_cast<SourceT>(hook->backend_->get_trampoline());
 
             return hook->callback_wrapper(
                 callable_source,
@@ -94,17 +94,37 @@ namespace Detail {
                 std::forward<Args>(args)...);
         }
     };
-} // namespace Detail
+} // namespace detail
 
-template <FunctionPtr SourceT, typename CallbackT>
-class Detour {
-    using HookPtrT = Detour<SourceT, CallbackT> *;
+/**
+ * @brief The backend interface you need to implement in order to perform
+ * hooking.
+ *
+ * You should manually save the context (like a hook object of your backend
+ * library), as uninstall() is called without any parameters.
+ */
+class DetourBackendInterface {
+public:
+    virtual ~DetourBackendInterface() = default;
 
-    friend struct Detail::thunk_wrapper<HookPtrT, SourceT>;
+    virtual void  install(void *source, const void *destination) = 0;
+    virtual void  uninstall()                                    = 0;
+    virtual void *get_trampoline()                               = 0;
+};
+
+template <cyanide::types::FunctionPtr SourceT, typename CallbackT>
+class DetourFrontend {
+    using HookPtrT = DetourFrontend<SourceT, CallbackT> *;
+
+    friend struct detail::ThunkWrapper<HookPtrT, SourceT>;
 
 public:
-    Detour(SourceT source, CallbackT callback)
-        : source_{reinterpret_cast<std::uint8_t *>(source)},
+    DetourFrontend(
+        DetourBackendInterface *backend,
+        SourceT                 source,
+        CallbackT               callback)
+        : backend_{backend},
+          source_{reinterpret_cast<cyanide::byte_t *>(source)},
           callback_{std::move(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
@@ -119,32 +139,26 @@ public:
         if (!thunk_)
             thunk_ = make_thunk();
 
-        if (!actual_hook_.Install(source_, const_cast<std::uint8_t *>(thunk_)))
-        {
-            throw std::runtime_error{"Failed to install the hook"};
-        }
+        backend_->install(source_, thunk_);
     }
 
     void uninstall()
     {
-        if (!actual_hook_.Remove())
-        {
-            throw std::runtime_error{"Failed to uninstall the hook"};
-        }
+        backend_->uninstall();
     }
 
 protected:
-    std::uint8_t *source_ = nullptr;
-    CallbackT     callback_{};
+    cyanide::byte_t *       source_ = nullptr;
+    CallbackT               callback_{};
+    DetourBackendInterface *backend_ = nullptr;
 
-    Xbyak::CodeGenerator code_gen_;
-    const std::uint8_t * thunk_ = nullptr;
-    subhook::Hook        actual_hook_;
+    Xbyak::CodeGenerator   code_gen_;
+    const cyanide::byte_t *thunk_ = nullptr;
 
-    const std::uint8_t *make_thunk()
+    const cyanide::byte_t *make_thunk()
     {
         using namespace Xbyak::util;
-        using namespace cyanide::Utils;
+        using namespace cyanide::types;
 
         constexpr auto source_conv = function_convention_v<SourceT>;
 
@@ -187,14 +201,14 @@ protected:
 
         if constexpr (source_conv == CallingConv::ccdecl)
         {
-            code_gen_.call(&Detail::thunk_wrapper<HookPtrT, SourceT>::func);
+            code_gen_.call(&detail::ThunkWrapper<HookPtrT, SourceT>::func);
             code_gen_.add(esp, 4);
             code_gen_.ret();
         }
         else
         {
             code_gen_.push(eax);
-            code_gen_.jmp(&Detail::thunk_wrapper<HookPtrT, SourceT>::func);
+            code_gen_.jmp(&detail::ThunkWrapper<HookPtrT, SourceT>::func);
         }
 
         return code_gen_.getCode();
@@ -219,6 +233,6 @@ protected:
     }
 };
 
-} // namespace cyanide::Hooks
+} // namespace cyanide::hooks
 
-#endif // !CYANIDE_DETOUR_HPP_
+#endif // !CYANIDE_HOOKS_FRONTEND_HPP_
