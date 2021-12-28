@@ -4,8 +4,11 @@ project(cyanide VERSION 0.1.0
                 DESCRIPTION "Useful utilities and wrappers"
                 LANGUAGES CXX)
 
-option(CYANIDE_COMPLETE "Enable all the library features" OFF)
-option(CYANIDE_HOOKS_SUPPORT "Enable hooks utilities support" ${CYANIDE_COMPLETE})
+option(CYANIDE_FEATURE_ALL "Enable all the library features" ON)
+
+option(CYANIDE_FEATURE_MEMORY "Enable memory-related features" ${CYANIDE_FEATURE_ALL})
+option(CYANIDE_FEATURE_HOOK_FRONTEND "Enable hook frontend support" ${CYANIDE_FEATURE_MEMORY})
+option(CYANIDE_FEATURE_HOOK_BACKEND_SUBHOOK "Enable subhook hook backend support" ${CYANIDE_FEATURE_MEMORY})
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(CYANIDE_MASTER_PROJECT ON)

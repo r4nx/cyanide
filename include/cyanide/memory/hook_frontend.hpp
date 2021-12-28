@@ -1,6 +1,7 @@
-#ifndef CYANIDE_HOOKS_FRONTEND_HPP_
-#define CYANIDE_HOOKS_FRONTEND_HPP_
+#ifndef CYANIDE_MEMORY_HOOK_FRONTEND_HPP_
+#define CYANIDE_MEMORY_HOOK_FRONTEND_HPP_
 
+#include <cyanide/memory/hook_backend_interface.hpp>
 #include <cyanide/misc/defs.hpp>
 #include <cyanide/types/function_traits.hpp>
 #include <xbyak/xbyak.h>
@@ -11,7 +12,7 @@
 #include <stdexcept>
 #include <utility> // std::move, std::forward
 
-namespace cyanide::hooks {
+namespace cyanide::memory {
 
 namespace detail {
     template <typename, typename>
@@ -95,22 +96,6 @@ namespace detail {
         }
     };
 } // namespace detail
-
-/**
- * @brief The backend interface you need to implement in order to perform
- * hooking.
- *
- * You should manually save the context (like a hook object of your backend
- * library), as uninstall() is called without any parameters.
- */
-class DetourBackendInterface {
-public:
-    virtual ~DetourBackendInterface() = default;
-
-    virtual void  install(void *source, const void *destination) = 0;
-    virtual void  uninstall()                                    = 0;
-    virtual void *get_trampoline()                               = 0;
-};
 
 template <cyanide::types::FunctionPtr SourceT, typename CallbackT>
 class DetourFrontend {
@@ -233,6 +218,6 @@ protected:
     }
 };
 
-} // namespace cyanide::hooks
+} // namespace cyanide::memory
 
-#endif // !CYANIDE_HOOKS_FRONTEND_HPP_
+#endif // !CYANIDE_MEMORY_HOOK_FRONTEND_HPP_

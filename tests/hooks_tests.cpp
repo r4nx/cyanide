@@ -1,28 +1,7 @@
-#include <cyanide/hooks/frontend.hpp>
+#include <cyanide/memory/hook_backend_subhook.hpp>
+#include <cyanide/memory/hook_frontend.hpp>
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <iostream>
-
-class Hooker : public cyanide::hooks::DetourBackendInterface {
-public:
-    void install(void *source, const void *destination) override
-    {
-        std::cout << "Installing hook at src: " << source
-                  << ", dst: " << destination << std::endl;
-    }
-
-    void uninstall() override
-    {
-        std::cout << "Uninstalling the hook" << std::endl;
-    }
-
-    void *get_trampoline() override
-    {
-        std::cout << "Requested the trampoline" << std::endl;
-        return nullptr;
-    }
-};
 
 __declspec(noinline) int test_func_a(int x, int y)
 {
@@ -35,16 +14,34 @@ __declspec(noinline) int test_func_a(int x, int y)
     return y / x;
 }
 
+TEST_CASE("Unhooked function")
+{
+    constexpr int x               = 3;
+    constexpr int y               = 4;
+    constexpr int expected_result = 2;
+
+    const int actual_result = test_func_a(x, y);
+
+    REQUIRE(actual_result == expected_result);
+}
+
 TEST_CASE("Detour")
 {
-    Hooker backend;
-
-    cyanide::hooks::DetourFrontend frontend{
+    cyanide::memory::SubhookDetourBackend backend;
+    cyanide::memory::DetourFrontend       frontend{
         &backend,
         &test_func_a,
         [](decltype(&test_func_a) orig, int x, int y) -> int {
-            return orig(x, y) + 1;
+            return orig(x, y) + 5;
         }};
 
     frontend.install();
+
+    constexpr int x               = 3;
+    constexpr int y               = 4;
+    constexpr int expected_result = 7;
+
+    const int actual_result = test_func_a(x, y);
+
+    REQUIRE(actual_result == expected_result);
 }
