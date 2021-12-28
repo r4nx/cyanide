@@ -9,7 +9,9 @@ target_include_directories(cyanide PUBLIC
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-add_subdirectory(memory)
+if(CYANIDE_FEATURE_MEMORY)
+	add_subdirectory(memory)
+endif()
 
 target_sources(cyanide PRIVATE
 	"main.cpp"

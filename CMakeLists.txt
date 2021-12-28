@@ -4,22 +4,23 @@ project(cyanide VERSION 0.1.0
                 DESCRIPTION "Useful utilities and wrappers"
                 LANGUAGES CXX)
 
+include(CMakeDependentOption)
+
 option(CYANIDE_FEATURE_ALL "Enable all the library features" ON)
 
-option(CYANIDE_FEATURE_MEMORY "Enable memory-related features" ${CYANIDE_FEATURE_ALL})
-option(CYANIDE_FEATURE_HOOK_FRONTEND "Enable hook frontend support" ${CYANIDE_FEATURE_MEMORY})
-option(CYANIDE_FEATURE_HOOK_BACKEND_SUBHOOK "Enable subhook hook backend support" ${CYANIDE_FEATURE_MEMORY})
+cmake_dependent_option(CYANIDE_FEATURE_MEMORY "Enable memory-related features" ON "CYANIDE_FEATURE_ALL" OFF)
+cmake_dependent_option(CYANIDE_FEATURE_HOOK_FRONTEND "Enable hook frontend support" ON "CYANIDE_FEATURE_MEMORY" OFF)
+cmake_dependent_option(CYANIDE_FEATURE_HOOK_BACKEND_SUBHOOK "Enable subhook hook backend support" ON "CYANIDE_FEATURE_MEMORY" OFF)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(CYANIDE_MASTER_PROJECT ON)
 endif()
 
-include(GNUInstallDirs)
-
 add_subdirectory(src)
 
 option(CYANIDE_INSTALL "Generate the install targets" ${CYANIDE_MASTER_PROJECT})
 if(CYANIDE_INSTALL)
+    include(GNUInstallDirs)
     include(CMakePackageConfigHelpers)
 
     install(
@@ -50,7 +51,7 @@ if(CYANIDE_INSTALL)
     install(FILES ${configFile} ${versionFile} DESTINATION ${configInstallDestination})
     install(
         EXPORT ${PROJECT_NAME}Targets
-        NAMESPACE "cyanide::"
+        NAMESPACE ${PROJECT_NAME}::
         DESTINATION ${configInstallDestination}
     )
 endif()
