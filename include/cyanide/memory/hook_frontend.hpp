@@ -107,16 +107,24 @@ public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT               callback)
+        CallbackT               callback,
+        bool                    uninstall_on_destroy = true)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::move(callback)}
+          callback_{std::move(callback)},
+          uninstall_on_destroy_{uninstall_on_destroy}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
         static_assert(
             sizeof(std::size_t) == address_size_32_bit,
             "Only 32-bit builds are supported");
+    }
+
+    ~DetourFrontend()
+    {
+        if (uninstall_on_destroy_)
+            backend_->uninstall();
     }
 
     void install()
@@ -133,9 +141,10 @@ public:
     }
 
 protected:
-    cyanide::byte_t *       source_ = nullptr;
-    CallbackT               callback_{};
     DetourBackendInterface *backend_ = nullptr;
+    cyanide::byte_t *       source_  = nullptr;
+    CallbackT               callback_{};
+    bool                    uninstall_on_destroy_ = true;
 
     Xbyak::CodeGenerator   code_gen_;
     const cyanide::byte_t *thunk_ = nullptr;
