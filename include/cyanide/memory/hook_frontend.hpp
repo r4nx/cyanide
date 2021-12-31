@@ -210,20 +210,20 @@ protected:
 
     template <typename Ret, typename... Args>
     static Ret callback_wrapper(
-        SourceT                     source,
-        std::function<Ret(Args...)> callback,
-        Args &&...args)
-    {
-        return callback(std::forward<Args>(args)...);
-    }
-
-    template <typename Ret, typename... Args>
-    static Ret callback_wrapper(
         SourceT                              source,
         std::function<Ret(SourceT, Args...)> callback,
         Args &&...args)
     {
         return callback(source, std::forward<Args>(args)...);
+    }
+
+    template <typename Ret, typename... Args>
+    static Ret callback_wrapper(
+        SourceT                     source,
+        std::function<Ret(Args...)> callback,
+        Args &&...args)
+    {
+        return callback(std::forward<Args>(args)...);
     }
 };
 
