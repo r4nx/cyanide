@@ -29,3 +29,13 @@ if(CYANIDE_FEATURE_HOOK_BACKEND_SUBHOOK)
 		"hook_backend_subhook.cpp"
 	)
 endif()
+
+if(CYANIDE_FEATURE_SIGNATURE_SCANNER)
+	if(WIN32)
+		target_sources(cyanide PRIVATE
+			"signature_scanner_win.cpp"
+		)
+	else()
+		message(FATAL_ERROR "Signature scanner isn't implemented for any platform other than Windows")
+	endif()
+endif()
