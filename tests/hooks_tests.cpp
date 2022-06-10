@@ -1,7 +1,6 @@
 #include <cyanide/memory/hook_backend_subhook.hpp>
 #include <cyanide/memory/hook_frontend.hpp>
 #include <cyanide/memory/signature_scanner_win.hpp>
-#include <cyanide/types/safe_pun.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
