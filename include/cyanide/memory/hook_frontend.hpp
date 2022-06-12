@@ -16,8 +16,7 @@ namespace cyanide::memory {
 
 namespace detail {
     template <typename, typename>
-    struct ThunkWrapper {
-    };
+    struct ThunkWrapper {};
 
     template <typename HookPtrT, typename Ret, typename... Args>
     struct ThunkWrapper<HookPtrT, Ret(__cdecl *)(Args...)> {
@@ -127,6 +126,9 @@ public:
             backend_->uninstall();
     }
 
+    DetourFrontend(const DetourFrontend &)            = delete;
+    DetourFrontend &operator=(const DetourFrontend &) = delete;
+
     void install()
     {
         if (!thunk_)
@@ -142,7 +144,7 @@ public:
 
 protected:
     DetourBackendInterface *backend_ = nullptr;
-    cyanide::byte_t *       source_  = nullptr;
+    cyanide::byte_t        *source_  = nullptr;
     CallbackT               callback_{};
     bool                    uninstall_on_destroy_ = true;
 
