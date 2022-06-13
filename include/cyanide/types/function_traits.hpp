@@ -13,8 +13,7 @@ concept FunctionPtr = std::is_function_v<std::remove_pointer_t<T>>;
 enum class CallingConv { cthiscall, ccdecl, cstdcall, cfastcall };
 
 template <typename>
-struct function_convention {
-};
+struct function_convention {};
 
 template <typename Ret, typename... Args>
 struct function_convention<Ret(__cdecl *)(Args...)> {
@@ -47,8 +46,7 @@ constexpr CallingConv function_convention_v = function_convention<Func>::value;
 // --------------------------------------------------------
 
 template <typename>
-struct method_to_func {
-};
+struct method_to_func {};
 
 template <typename Ret, typename Class, typename... Args>
 struct method_to_func<Ret (Class::*)(Args...)> {
