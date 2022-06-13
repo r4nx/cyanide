@@ -106,12 +106,10 @@ public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT               callback,
-        bool                    uninstall_on_destroy = true)
+        CallbackT               callback)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::move(callback)},
-          uninstall_on_destroy_{uninstall_on_destroy}
+          callback_{std::move(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
@@ -122,8 +120,7 @@ public:
 
     ~DetourFrontend()
     {
-        if (uninstall_on_destroy_)
-            backend_->uninstall();
+        backend_->uninstall();
     }
 
     DetourFrontend(const DetourFrontend &)            = delete;
@@ -146,7 +143,6 @@ protected:
     DetourBackendInterface *backend_ = nullptr;
     cyanide::byte_t        *source_  = nullptr;
     CallbackT               callback_{};
-    bool                    uninstall_on_destroy_ = true;
 
     Xbyak::CodeGenerator   code_gen_;
     const cyanide::byte_t *thunk_ = nullptr;
