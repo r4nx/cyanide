@@ -25,10 +25,10 @@ public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT             &&callback)
+        CallbackT               callback)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::forward<CallbackT>(callback)}
+          callback_{std::move(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
