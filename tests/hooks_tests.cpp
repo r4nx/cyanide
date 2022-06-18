@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include <cyanide/memory/hook_backend_subhook.hpp>
 #include <cyanide/memory/hook_frontend.hpp>
 #include <cyanide/memory/signature_scanner_win.hpp>

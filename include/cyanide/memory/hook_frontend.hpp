@@ -8,9 +8,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+#include <functional> // std::function
 #include <stdexcept>
-#include <utility> // std::move, std::forward
+#include <utility> // std::forward
 
 namespace cyanide::memory {
 
@@ -35,7 +35,7 @@ namespace detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function{hook->callback_},
+                hook->callback_,
                 std::forward<Args>(args)...);
         }
     };
@@ -51,7 +51,7 @@ namespace detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function{hook->callback_},
+                hook->callback_,
                 std::forward<Args>(args)...);
         }
     };
@@ -67,7 +67,7 @@ namespace detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function{hook->callback_},
+                hook->callback_,
                 std::forward<Args>(args)...);
         }
     };
@@ -90,7 +90,7 @@ namespace detail {
 
             return hook->callback_wrapper(
                 callable_source,
-                std::function{hook->callback_},
+                hook->callback_,
                 std::forward<Args>(args)...);
         }
     };
@@ -106,10 +106,10 @@ public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT               callback)
+        CallbackT             &&callback)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::move(callback)}
+          callback_{std::forward<CallbackT>(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
@@ -142,7 +142,15 @@ public:
 protected:
     DetourBackendInterface *backend_ = nullptr;
     cyanide::byte_t        *source_  = nullptr;
-    CallbackT               callback_{};
+
+    /*
+     * To store some callable the template parameters of std::function have to
+     * be specified in field defitions, i.e. here. In case if the callable is
+     * lambda (or some other functor), deduction guides must be envolved. To use
+     * them, we simulate the std::function initialization and retrieve the
+     * result type.
+     */
+    decltype(std::function{std::declval<CallbackT>()}) callback_;
 
     Xbyak::CodeGenerator   code_gen_;
     const cyanide::byte_t *thunk_ = nullptr;
@@ -208,8 +216,8 @@ protected:
 
     template <typename Ret, typename... Args>
     static Ret callback_wrapper(
-        SourceT                              source,
-        std::function<Ret(SourceT, Args...)> callback,
+        SourceT                                     source,
+        const std::function<Ret(SourceT, Args...)> &callback,
         Args &&...args)
     {
         return callback(source, std::forward<Args>(args)...);
@@ -217,8 +225,8 @@ protected:
 
     template <typename Ret, typename... Args>
     static Ret callback_wrapper(
-        SourceT                     source,
-        std::function<Ret(Args...)> callback,
+        SourceT                            source,
+        const std::function<Ret(Args...)> &callback,
         Args &&...args)
     {
         return callback(std::forward<Args>(args)...);
