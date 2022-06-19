@@ -26,6 +26,9 @@ To safe_pun(const cyanide::byte_t *data)
     static_assert(sizeof(To) == from_size);
     static_assert(std::is_trivially_copyable_v<To>);
 
+    // As source type (cyanide::byte_t) and destination type (To) may (and most
+    // likely will) have different sizes, we have to use this intermediate
+    // bytes array
     struct BytesArray {
         cyanide::byte_t arr[sizeof(To)]{};
     };
