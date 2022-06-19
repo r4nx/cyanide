@@ -2,6 +2,7 @@
 #include <cyanide/misc/defs.hpp>
 #include <cyanide/types/safe_pun.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -61,7 +62,7 @@ cyanide::byte_t *WinAPISignatureScanner::scan(const Signature &signature)
 
         // Scanning succeed
         if (i == pattern_size)
-            return current_byte;
+            return current_byte + signature.offset;
     }
 
     return nullptr;
