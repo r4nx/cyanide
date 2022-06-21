@@ -13,6 +13,7 @@
 #include <functional> // std::move_only_function
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <utility> // std::exchange, std::forward, std::move, std::swap
 
 namespace cyanide::memory {
@@ -23,14 +24,18 @@ class DetourFrontend {
 
     friend struct detail::ThunkWrapper<HookPtrT, SourceT>;
 
+    static constexpr bool move_only_callback = std::conjunction_v<
+        std::is_move_constructible<CallbackT>,
+        std::negation<std::is_copy_constructible<CallbackT>>>;
+
 public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT             &&callback)
+        CallbackT               callback)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::forward<CallbackT>(callback)}
+          callback_{std::move(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
@@ -102,8 +107,26 @@ protected:
     DetourBackendInterface *backend_ = nullptr;
     cyanide::byte_t        *source_  = nullptr;
 
-    std::move_only_function<
-        typename cyanide::types::function_decompose<CallbackT>::Signature>
+    /*
+     * There are 2 ways to retrieve the CallbackT signature - by decomposing it
+     * via type traits, and by simulating the initialization of std::function.
+     * First one may not work for some cases (like overloaded function?), but
+     * allows us to use std::move_only_function, which, in turn, lets the
+     * move-only types be used as a callback.
+     *
+     * As for the second one - to store some callable, the template parameters
+     * of std::function have to be specified in field defitions, i.e. here. In
+     * case if the callable is lambda (or some other functor), deduction guides
+     * must be envolved. To use them, we simulate the std::function
+     * initialization and retrieve the result type.
+     * 
+     * https://stackoverflow.com/a/53673648
+     */
+    std::conditional_t<
+        move_only_callback,
+        std::move_only_function<
+            typename cyanide::types::function_decompose<CallbackT>::Signature>,
+        decltype(std::function{std::declval<CallbackT>()})>
         callback_;
 
     std::unique_ptr<Xbyak::CodeGenerator> code_gen_;
@@ -166,6 +189,24 @@ protected:
         }
 
         return code_gen_->getCode();
+    }
+
+    template <typename Ret, typename... Args>
+    static Ret callback_wrapper(
+        SourceT                               source,
+        std::function<Ret(SourceT, Args...)> &callback,
+        Args &&...args)
+    {
+        return callback(source, std::forward<Args>(args)...);
+    }
+
+    template <typename Ret, typename... Args>
+    static Ret callback_wrapper(
+        SourceT                      source,
+        std::function<Ret(Args...)> &callback,
+        Args &&...args)
+    {
+        return callback(std::forward<Args>(args)...);
     }
 
     template <typename Ret, typename... Args>
