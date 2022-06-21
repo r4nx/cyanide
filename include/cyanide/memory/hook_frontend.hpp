@@ -10,7 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional> // std::function
+#include <functional> // std::move_only_function
 #include <memory>
 #include <stdexcept>
 #include <utility> // std::exchange, std::forward, std::move, std::swap
@@ -102,7 +102,7 @@ protected:
     DetourBackendInterface *backend_ = nullptr;
     cyanide::byte_t        *source_  = nullptr;
 
-    std::function<
+    std::move_only_function<
         typename cyanide::types::function_decompose<CallbackT>::Signature>
         callback_;
 
@@ -170,8 +170,8 @@ protected:
 
     template <typename Ret, typename... Args>
     static Ret callback_wrapper(
-        SourceT                                     source,
-        const std::function<Ret(SourceT, Args...)> &callback,
+        SourceT                                         source,
+        std::move_only_function<Ret(SourceT, Args...)> &callback,
         Args &&...args)
     {
         return callback(source, std::forward<Args>(args)...);
@@ -179,8 +179,8 @@ protected:
 
     template <typename Ret, typename... Args>
     static Ret callback_wrapper(
-        SourceT                            source,
-        const std::function<Ret(Args...)> &callback,
+        SourceT                                source,
+        std::move_only_function<Ret(Args...)> &callback,
         Args &&...args)
     {
         return callback(std::forward<Args>(args)...);
