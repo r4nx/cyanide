@@ -70,6 +70,7 @@ struct function_decompose {};
 
 template <typename Ret, typename... Args>
 struct function_decompose<Ret (*)(Args...)> {
+    using Signature   = Ret(Args...);
     using return_type = Ret;
     using arguments   = std::tuple<Args...>;
 };

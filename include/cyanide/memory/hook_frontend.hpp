@@ -27,10 +27,10 @@ public:
     DetourFrontend(
         DetourBackendInterface *backend,
         SourceT                 source,
-        CallbackT               callback)
+        CallbackT             &&callback)
         : backend_{backend},
           source_{reinterpret_cast<cyanide::byte_t *>(source)},
-          callback_{std::move(callback)}
+          callback_{std::forward<CallbackT>(callback)}
     {
         constexpr std::size_t address_size_32_bit = 4;
 
@@ -102,14 +102,9 @@ protected:
     DetourBackendInterface *backend_ = nullptr;
     cyanide::byte_t        *source_  = nullptr;
 
-    /*
-     * To store some callable the template parameters of std::function have to
-     * be specified in field defitions, i.e. here. In case if the callable is
-     * lambda (or some other functor), deduction guides must be envolved. To use
-     * them, we simulate the std::function initialization and retrieve the
-     * result type.
-     */
-    decltype(std::function{std::declval<CallbackT>()}) callback_;
+    std::function<
+        typename cyanide::types::function_decompose<CallbackT>::Signature>
+        callback_;
 
     std::unique_ptr<Xbyak::CodeGenerator> code_gen_;
     const cyanide::byte_t                *thunk_ = nullptr;
