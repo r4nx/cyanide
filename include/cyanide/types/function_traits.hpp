@@ -1,12 +1,19 @@
 #ifndef CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
 #define CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
 
+#include <tuple>
 #include <type_traits>
 
 namespace cyanide::types {
 
 template <typename T>
 concept FunctionPtr = std::is_function_v<std::remove_pointer_t<T>>;
+
+template <typename T>
+concept Functor = requires(T a)
+{
+    a.operator();
+};
 
 // --------------------------------------------------------
 
@@ -43,7 +50,7 @@ struct function_convention<Ret(__fastcall *)(Args...)> {
 template <typename Func>
 constexpr CallingConv function_convention_v = function_convention<Func>::value;
 
-// --------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 template <typename>
 struct method_to_func {};
@@ -55,6 +62,28 @@ struct method_to_func<Ret (Class::*)(Args...)> {
 
 template <typename T>
 using method_to_func_t = typename method_to_func<T>::type;
+
+// ----------------------------------------------------------------------------
+
+template <typename>
+struct function_decompose {};
+
+template <typename Ret, typename... Args>
+struct function_decompose<Ret (*)(Args...)> {
+    using return_type = Ret;
+    using arguments   = std::tuple<Args...>;
+};
+
+template <typename Ret, typename Class, typename... Args>
+struct function_decompose<Ret (Class::*)(Args...)>
+    : function_decompose<Ret (*)(Args...)> {};
+
+template <typename Ret, typename Class, typename... Args>
+struct function_decompose<Ret (Class::*)(Args...) const>
+    : function_decompose<Ret (Class::*)(Args...)> {};
+
+template <Functor F>
+struct function_decompose<F> : function_decompose<decltype(&F::operator())> {};
 
 } // namespace cyanide::types
 
