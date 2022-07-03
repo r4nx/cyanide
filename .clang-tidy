@@ -13,6 +13,5 @@ Checks: >
   portability-*
 WarningsAsErrors: ''
 HeaderFilterRegex: ''
-AnalyzeTemporaryDtors: false
 CheckOptions:
 ...
