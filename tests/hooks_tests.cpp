@@ -1,10 +1,10 @@
 #define NOMINMAX
 
-#include <cyanide/memory/hook_backend_subhook.hpp>
-#include <cyanide/memory/hook_frontend.hpp>
-#include <cyanide/memory/signature_scanner_win.hpp>
+#include <cyanide/hook_impl_polyhook.hpp>
+#include <cyanide/hook_wrapper.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <polyhook2/Detour/x86Detour.hpp>
 
 #include <functional> // std::bind_front, std::function
 #include <utility>    // std::move
@@ -34,7 +34,7 @@ private:
     int replacing_value_ = 0;
 };
 
-TEST_CASE("Unhooked function", "[memory][hooks]")
+TEST_CASE("Unhooked function", "[hooks]")
 {
     constexpr int x               = 3;
     constexpr int y               = 4;
@@ -45,7 +45,7 @@ TEST_CASE("Unhooked function", "[memory][hooks]")
     REQUIRE(actual_result == expected_result);
 }
 
-TEST_CASE("Detour with lambda callback", "[memory][hooks]")
+TEST_CASE("Detour with lambda callback", "[hooks]")
 {
     constexpr int x                      = 3;
     constexpr int y                      = 4;
@@ -53,15 +53,14 @@ TEST_CASE("Detour with lambda callback", "[memory][hooks]")
     constexpr int expected_result_hooked = 7;
 
     {
-        cyanide::memory::SubhookDetourBackend backend;
-        cyanide::memory::DetourFrontend       frontend{
-            &backend,
-            &test_func_a,
-            [](decltype(&test_func_a) orig, int x, int y) -> int {
-                return orig(x, y) + 5;
-            }};
+        auto callback = [](decltype(&test_func_a) orig, int x, int y) -> int {
+            return orig(x, y) + 5;
+        };
 
-        frontend.install();
+        auto wrapper =
+            cyanide::make_polyhook_x86(&test_func_a, std::move(callback));
+
+        wrapper.install();
 
         const int actual_result = test_func_a(x, y);
         REQUIRE(actual_result == expected_result_hooked);
@@ -72,7 +71,7 @@ TEST_CASE("Detour with lambda callback", "[memory][hooks]")
     REQUIRE(actual_result == expected_result);
 }
 
-TEST_CASE("Detour with member function callback", "[memory][hooks]")
+TEST_CASE("Detour with member function callback", "[hooks]")
 {
     constexpr int x                      = 3;
     constexpr int y                      = 4;
@@ -85,13 +84,10 @@ TEST_CASE("Detour with member function callback", "[memory][hooks]")
         std::function<decltype(test_func_a)> callback{
             std::bind_front(&Hooker::callback, &hooker)};
 
-        cyanide::memory::SubhookDetourBackend backend;
-        cyanide::memory::DetourFrontend       frontend{
-            &backend,
-            &test_func_a,
-            std::move(callback)};
+        auto wrapper =
+            cyanide::make_polyhook_x86(&test_func_a, std::move(callback));
 
-        frontend.install();
+        wrapper.install();
 
         const int actual_result = test_func_a(x, y);
         REQUIRE(actual_result == expected_result_hooked);

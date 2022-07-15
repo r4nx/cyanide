@@ -1,69 +1,84 @@
-#ifndef CYANIDE_MEMORY_HOOK_FRONTEND_HPP_
-#define CYANIDE_MEMORY_HOOK_FRONTEND_HPP_
+#ifndef CYANIDE_HOOK_WRAPPER_HPP_
+#define CYANIDE_HOOK_WRAPPER_HPP_
 
-#include <cyanide/memory/hook_backend_interface.hpp>
-#include <cyanide/memory/thunk_wrapper.hpp>
-#include <cyanide/misc/defs.hpp>
-#include <cyanide/types/function_traits.hpp>
+#include <cyanide/defs.hpp>
+#include <cyanide/detail/relay.hpp>
+#include <cyanide/function_traits.hpp>
 
 #include <xbyak/xbyak.h>
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <functional> // std::move_only_function
+#include <functional>
 #include <memory>
-#include <stdexcept>
 #include <type_traits>
 #include <utility> // std::exchange, std::forward, std::move, std::swap
 
-namespace cyanide::memory {
+namespace cyanide {
 
-template <cyanide::types::FunctionPtr SourceT, typename CallbackT>
-class DetourFrontend {
-    using HookPtrT = DetourFrontend<SourceT, CallbackT> *;
+namespace types {
+    template <typename T>
+    concept HookConcept = std::default_initializable<T> && requires(
+        T           hook_impl,
+        void       *source,
+        const void *destination)
+    {
+        hook_impl.install(source, destination);
+        hook_impl.uninstall();
 
-    friend struct detail::ThunkWrapper<HookPtrT, SourceT>;
+        // Enable clang format when concepts will be handled properly
+        // clang-format off
+        { hook_impl.get_trampoline() } -> std::convertible_to<void *>;
+        // clang-format on
+    };
+} // namespace types
+
+template <
+    cyanide::types::HookConcept HookT,
+    cyanide::types::FunctionPtr SourceT,
+    typename CallbackT,
+    typename... HookArgs>
+class hook_wrapper {
+    using this_t = hook_wrapper<HookT, SourceT, CallbackT>;
+
+    friend struct cyanide::detail::relay<this_t, SourceT>;
 
     static constexpr bool move_only_callback = std::conjunction_v<
         std::is_move_constructible<CallbackT>,
         std::negation<std::is_copy_constructible<CallbackT>>>;
 
 public:
-    DetourFrontend(
-        DetourBackendInterface *backend,
-        SourceT                 source,
-        CallbackT               callback)
-        : backend_{backend},
-          source_{reinterpret_cast<cyanide::byte_t *>(source)},
+    hook_wrapper(SourceT source, CallbackT callback, HookArgs &&...hook_args)
+        : source_{reinterpret_cast<cyanide::byte_t *>(source)},
           callback_{std::move(callback)}
     {
-        constexpr std::size_t address_size_32_bit = 4;
-
         static_assert(
-            sizeof(std::size_t) == address_size_32_bit,
+            sizeof(std::size_t) == 4,
             "Only 32-bit builds are supported");
 
+        hook_impl_ =
+            std::make_unique<HookT>(std::forward<HookArgs>(hook_args)...);
         code_gen_ = std::make_unique<Xbyak::CodeGenerator>();
     }
 
-    ~DetourFrontend()
+    ~hook_wrapper()
     {
-        if (backend_)
-            backend_->uninstall();
+        hook_impl_->uninstall();
     }
 
-    DetourFrontend(const DetourFrontend &)            = delete;
-    DetourFrontend &operator=(const DetourFrontend &) = delete;
+    hook_wrapper(const hook_wrapper &)            = delete;
+    hook_wrapper &operator=(const hook_wrapper &) = delete;
 
-    DetourFrontend(DetourFrontend &&other)
-        : backend_{std::exchange(other.backend_, nullptr)},
-          source_{std::exchange(other.source_, nullptr)},
+    hook_wrapper(hook_wrapper &&other)
+        : source_{std::exchange(other.source_, nullptr)},
+          relay_jump_{std::exchange(other.relay_jump_, nullptr)},
           callback_{std::move(other.callback_)},
-          code_gen_{std::move(other.code_gen_)},
-          thunk_{std::exchange(other.thunk_, nullptr)}
+          hook_impl_{std::move(other.hook_impl_)},
+          code_gen_{std::move(other.code_gen_)}
     {}
 
-    DetourFrontend &operator=(DetourFrontend &&other)
+    hook_wrapper &operator=(hook_wrapper &&other)
     {
         using std::swap;
 
@@ -73,39 +88,34 @@ public:
          * stack overflow, because std::swap is implemented with the use of move
          * assignment (which we are currently trying to implement)
          */
-        DetourFrontend tmp{std::move(other)};
+        hook_wrapper tmp{std::move(other)};
         swap(tmp, *this);
 
         return *this;
     }
 
-    friend void swap(DetourFrontend &lhs, DetourFrontend &rhs)
+    friend void swap(hook_wrapper &lhs, hook_wrapper &rhs)
     {
         using std::swap;
 
-        swap(lhs.backend_, rhs.backend_);
         swap(lhs.source_, rhs.source_);
+        swap(lhs.relay_, lhs.relay_);
         swap(lhs.callback_, rhs.callback_);
+        swap(lhs.hook_impl_, rhs.hook_impl_);
         swap(lhs.code_gen_, rhs.code_gen_);
-        swap(lhs.thunk_, rhs.thunk_);
     }
 
     void install()
     {
-        if (!thunk_)
-            thunk_ = make_thunk();
+        if (!relay_jump_)
+            relay_jump_ = make_relay_jump();
 
-        backend_->install(source_, thunk_);
-    }
-
-    void uninstall()
-    {
-        backend_->uninstall();
+        hook_impl_->install(source_, relay_jump_);
     }
 
 protected:
-    DetourBackendInterface *backend_ = nullptr;
-    cyanide::byte_t        *source_  = nullptr;
+    cyanide::byte_t       *source_     = nullptr;
+    const cyanide::byte_t *relay_jump_ = nullptr;
 
     /*
      * There are 2 ways to retrieve the CallbackT signature - by decomposing it
@@ -115,24 +125,24 @@ protected:
      * move-only types be used as a callback.
      *
      * As for the second one - to store some callable, the template parameters
-     * of std::function have to be specified in field defitions, i.e. here. In
+     * of std::function have to be specified in field definition, i.e. here. In
      * case if the callable is lambda (or some other functor), deduction guides
      * must be envolved. To use them, we simulate the std::function
      * initialization and retrieve the result type.
-     * 
+     *
      * https://stackoverflow.com/a/53673648
      */
     std::conditional_t<
         move_only_callback,
-        std::move_only_function<
-            typename cyanide::types::function_decompose<CallbackT>::Signature>,
+        std::move_only_function<typename cyanide::types::function_decompose<
+            std::remove_reference_t<CallbackT>>::signature>,
         decltype(std::function{std::declval<CallbackT>()})>
         callback_;
 
+    std::unique_ptr<HookT>                hook_impl_;
     std::unique_ptr<Xbyak::CodeGenerator> code_gen_;
-    const cyanide::byte_t                *thunk_ = nullptr;
 
-    const cyanide::byte_t *make_thunk()
+    const cyanide::byte_t *make_relay_jump()
     {
         using namespace Xbyak::util;
         using namespace cyanide::types;
@@ -167,32 +177,32 @@ protected:
          * original address with no troubles.
          */
 
-        if constexpr (source_conv != CallingConv::ccdecl)
+        if constexpr (source_conv != calling_conv::ccdecl)
             code_gen_->pop(eax);
 
         // Pass this pointer as argument
-        if constexpr (source_conv == CallingConv::cthiscall)
+        if constexpr (source_conv == calling_conv::cthiscall)
             code_gen_->push(ecx);
 
         code_gen_->push(reinterpret_cast<std::uintptr_t>(this));
 
-        if constexpr (source_conv == CallingConv::ccdecl)
+        if constexpr (source_conv == calling_conv::ccdecl)
         {
-            code_gen_->call(&detail::ThunkWrapper<HookPtrT, SourceT>::func);
+            code_gen_->call(&detail::relay<this_t, SourceT>::func);
             code_gen_->add(esp, 4);
             code_gen_->ret();
         }
         else
         {
             code_gen_->push(eax);
-            code_gen_->jmp(&detail::ThunkWrapper<HookPtrT, SourceT>::func);
+            code_gen_->jmp(&detail::relay<this_t, SourceT>::func);
         }
 
         return code_gen_->getCode();
     }
 
     template <typename Ret, typename... Args>
-    static Ret callback_wrapper(
+    static Ret callback_dispatcher(
         SourceT                               source,
         std::function<Ret(SourceT, Args...)> &callback,
         Args &&...args)
@@ -201,7 +211,7 @@ protected:
     }
 
     template <typename Ret, typename... Args>
-    static Ret callback_wrapper(
+    static Ret callback_dispatcher(
         SourceT                      source,
         std::function<Ret(Args...)> &callback,
         Args &&...args)
@@ -210,7 +220,7 @@ protected:
     }
 
     template <typename Ret, typename... Args>
-    static Ret callback_wrapper(
+    static Ret callback_dispatcher(
         SourceT                                         source,
         std::move_only_function<Ret(SourceT, Args...)> &callback,
         Args &&...args)
@@ -219,7 +229,7 @@ protected:
     }
 
     template <typename Ret, typename... Args>
-    static Ret callback_wrapper(
+    static Ret callback_dispatcher(
         SourceT                                source,
         std::move_only_function<Ret(Args...)> &callback,
         Args &&...args)
@@ -228,6 +238,6 @@ protected:
     }
 };
 
-} // namespace cyanide::memory
+} // namespace cyanide
 
-#endif // !CYANIDE_MEMORY_HOOK_FRONTEND_HPP_
+#endif // !CYANIDE_HOOK_WRAPPER_HPP_

@@ -9,27 +9,9 @@ include(CMakeDependentOption)
 option(CYANIDE_FEATURE_ALL "Enable all the library features" ON)
 
 cmake_dependent_option(
-    CYANIDE_FEATURE_MEMORY
-    "Enable memory-related features" ON
+    CYANIDE_FEATURE_HOOK
+    "Enable hooks support" ON
     "CYANIDE_FEATURE_ALL" OFF
-)
-
-cmake_dependent_option(
-    CYANIDE_FEATURE_HOOK_FRONTEND
-    "Enable hook frontend support" ON
-    "CYANIDE_FEATURE_MEMORY" OFF
-)
-
-cmake_dependent_option(
-    CYANIDE_FEATURE_HOOK_BACKEND_SUBHOOK
-    "Enable subhook hook backend support" ON
-    "CYANIDE_FEATURE_MEMORY" OFF
-)
-
-cmake_dependent_option(
-    CYANIDE_FEATURE_SIGNATURE_SCANNER
-    "Enable signature scanner support" ON
-    "CYANIDE_FEATURE_MEMORY" OFF
 )
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)

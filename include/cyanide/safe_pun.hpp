@@ -1,5 +1,5 @@
-#ifndef CYANIDE_TYPES_SAFE_PUN_HPP_
-#define CYANIDE_TYPES_SAFE_PUN_HPP_
+#ifndef CYANIDE_SAFE_PUN_HPP_
+#define CYANIDE_SAFE_PUN_HPP_
 
 #include <cyanide/misc/defs.hpp>
 
@@ -8,7 +8,7 @@
 #include <cstring>     // std::memcpy
 #include <type_traits> // std::is_trivially_copyable, std::decay
 
-namespace cyanide::types {
+namespace cyanide {
 
 /**
  * @brief Safe type-punning of types of not necessarily the same size.
@@ -29,11 +29,11 @@ To safe_pun(const cyanide::byte_t *data)
     // As source type (cyanide::byte_t) and destination type (To) may (and most
     // likely will) have different sizes, we have to use this intermediate
     // bytes array
-    struct BytesArray {
-        cyanide::byte_t arr[sizeof(To)]{};
+    struct bytes_array {
+        alignas(To) cyanide::byte_t arr[sizeof(To)]{};
     };
 
-    BytesArray bytes;
+    bytes_array bytes;
 
     // Explicitly decay array to pointer to avoid warnings
     std::memcpy(
@@ -44,6 +44,6 @@ To safe_pun(const cyanide::byte_t *data)
     return std::bit_cast<To>(bytes);
 }
 
-} // namespace cyanide::types
+} // namespace cyanide
 
-#endif // !CYANIDE_TYPES_SAFE_PUN_HPP_
+#endif // !CYANIDE_SAFE_PUN_HPP_

@@ -1,5 +1,5 @@
-#ifndef CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
-#define CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
+#ifndef CYANIDE_FUNCTION_TRAITS_HPP_
+#define CYANIDE_FUNCTION_TRAITS_HPP_
 
 #include <tuple>
 #include <type_traits>
@@ -15,40 +15,41 @@ concept Functor = requires(T a)
     a.operator();
 };
 
-// --------------------------------------------------------
+// ----------------------------------------------------------------------------
 
-enum class CallingConv { cthiscall, ccdecl, cstdcall, cfastcall };
+enum class calling_conv { cthiscall, ccdecl, cstdcall, cfastcall };
 
 template <typename>
 struct function_convention {};
 
 template <typename Ret, typename... Args>
 struct function_convention<Ret(__cdecl *)(Args...)> {
-    static constexpr CallingConv value = CallingConv::ccdecl;
+    static constexpr calling_conv value = calling_conv::ccdecl;
 };
 
 template <typename Ret, typename... Args>
 struct function_convention<Ret(__stdcall *)(Args...)> {
-    static constexpr CallingConv value = CallingConv::cstdcall;
+    static constexpr calling_conv value = calling_conv::cstdcall;
 };
 
 template <typename Ret, typename... Args>
 struct function_convention<Ret(__thiscall *)(Args...)> {
-    static constexpr CallingConv value = CallingConv::cthiscall;
+    static constexpr calling_conv value = calling_conv::cthiscall;
 };
 
 template <typename Ret, typename Class, typename... Args>
 struct function_convention<Ret (Class::*)(Args...)> {
-    static constexpr CallingConv value = CallingConv::cthiscall;
+    static constexpr calling_conv value = calling_conv::cthiscall;
 };
 
 template <typename Ret, typename... Args>
 struct function_convention<Ret(__fastcall *)(Args...)> {
-    static constexpr CallingConv value = CallingConv::cfastcall;
+    static constexpr calling_conv value = calling_conv::cfastcall;
 };
 
 template <typename Func>
-constexpr CallingConv function_convention_v = function_convention<Func>::value;
+inline constexpr calling_conv function_convention_v =
+    function_convention<Func>::value;
 
 // ----------------------------------------------------------------------------
 
@@ -70,7 +71,7 @@ struct function_decompose {};
 
 template <typename Ret, typename... Args>
 struct function_decompose<Ret (*)(Args...)> {
-    using Signature   = Ret(Args...);
+    using signature   = Ret(Args...);
     using return_type = Ret;
     using arguments   = std::tuple<Args...>;
 };
@@ -88,4 +89,4 @@ struct function_decompose<F> : function_decompose<decltype(&F::operator())> {};
 
 } // namespace cyanide::types
 
-#endif // !CYANIDE_TYPES_FUNCTION_TRAITS_HPP_
+#endif // !CYANIDE_FUNCTION_TRAITS_HPP_
