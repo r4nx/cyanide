@@ -57,8 +57,7 @@ TEST_CASE("Detour with lambda callback", "[hooks]")
             return orig(x, y) + 5;
         };
 
-        auto wrapper =
-            cyanide::make_polyhook_x86(&test_func_a, std::move(callback));
+        cyanide::polyhook_x86 wrapper{&test_func_a, std::move(callback)};
 
         wrapper.install();
 
@@ -84,8 +83,7 @@ TEST_CASE("Detour with member function callback", "[hooks]")
         std::function<decltype(test_func_a)> callback{
             std::bind_front(&Hooker::callback, &hooker)};
 
-        auto wrapper =
-            cyanide::make_polyhook_x86(&test_func_a, std::move(callback));
+        cyanide::polyhook_x86 wrapper{&test_func_a, std::move(callback)};
 
         wrapper.install();
 

@@ -50,24 +50,15 @@ protected:
     std::uint64_t        trampoline_ = 0;
 };
 
-template <
-    cyanide::types::FunctionPtr SourceT,
-    typename CallbackT,
-    typename... HookArgs>
-auto make_polyhook_x86(
-    SourceT   &&source,
-    CallbackT &&callback,
-    HookArgs &&...hook_args)
-{
-    return hook_wrapper<
-        polyhook_implementation<PLH::x86Detour>,
-        SourceT,
-        CallbackT,
-        HookArgs...>{
-        std::forward<SourceT>(source),
-        std::forward<CallbackT>(callback),
-        std::forward<HookArgs>(hook_args)...};
-}
+template <typename... Args>
+class polyhook_x86
+    : public hook_wrapper<polyhook_implementation<PLH::x86Detour>, Args...> {
+public:
+    polyhook_x86(Args &&...args)
+        : hook_wrapper<polyhook_implementation<PLH::x86Detour>, Args...>{
+            std::forward<Args>(args)...}
+    {}
+};
 
 } // namespace cyanide
 
