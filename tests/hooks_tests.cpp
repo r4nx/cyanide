@@ -34,6 +34,25 @@ private:
     int replacing_value_ = 0;
 };
 
+struct big_struct {
+    int x;
+    int y;
+    int z;
+
+    auto operator<=>(const big_struct &other) const = default;
+};
+
+__declspec(noinline) big_struct __cdecl test_func_b(int a, int b, int c)
+{
+    static_cast<void>(a);
+    static_cast<void>(b);
+    static_cast<void>(c);
+
+    big_struct bs{3, 5, 7};
+
+    return bs;
+}
+
 TEST_CASE("Unhooked function", "[hooks]")
 {
     constexpr int x               = 3;
@@ -92,5 +111,29 @@ TEST_CASE("Detour with member function callback", "[hooks]")
     }
 
     const int actual_result = test_func_a(x, y);
+    REQUIRE(actual_result == expected_result);
+}
+
+TEST_CASE("Detour hooking the function with large return value", "[hooks]")
+{
+    constexpr big_struct expected_result{3, 5, 7};
+    constexpr big_struct expected_result_hooked{10, 20, 30};
+
+    {
+        auto callback = [](decltype(&test_func_b) orig, int a, int b, int c) {
+            big_struct bs{10, 20, 30};
+
+            return bs;
+        };
+
+        cyanide::polyhook_x86 wrapper{&test_func_b, std::move(callback)};
+
+        wrapper.install();
+
+        const big_struct actual_result = test_func_b(1, 2, 3);
+        REQUIRE(actual_result == expected_result_hooked);
+    }
+
+    const big_struct actual_result = test_func_b(1, 2, 3);
     REQUIRE(actual_result == expected_result);
 }

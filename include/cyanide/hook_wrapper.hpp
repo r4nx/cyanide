@@ -149,6 +149,10 @@ protected:
 
         constexpr auto source_conv = function_convention_v<SourceT>;
 
+        // Is the return value passed as hidden out parameter instead of being
+        // returned through registers
+        constexpr bool hidden_param_return = sizeof(result_type_t<SourceT>) > 8;
+
         code_gen_->reset();
 
         /*
@@ -177,8 +181,23 @@ protected:
          * original address with no troubles.
          */
 
-        if constexpr (source_conv != calling_conv::ccdecl)
+        if constexpr (source_conv == calling_conv::ccdecl)
+        {
+            // Swap the hidden output parameter with return address
+            if constexpr (hidden_param_return)
+            {
+                code_gen_->pop(eax);
+                code_gen_->pop(edx);
+                code_gen_->push(eax);
+            }
+        }
+        else
+        {
             code_gen_->pop(eax);
+
+            if constexpr (hidden_param_return)
+                code_gen_->pop(edx);
+        }
 
         // Pass this pointer as argument
         if constexpr (source_conv == calling_conv::cthiscall)
@@ -186,10 +205,28 @@ protected:
 
         code_gen_->push(reinterpret_cast<std::uintptr_t>(this));
 
+        if constexpr (hidden_param_return)
+            code_gen_->push(edx);
+
         if constexpr (source_conv == calling_conv::ccdecl)
         {
             code_gen_->call(&detail::relay<this_t, SourceT>::func);
-            code_gen_->add(esp, 4);
+
+            if constexpr (hidden_param_return)
+            {
+                // Remove hook object from the stack, swap the hidden output
+                // parameter with return address back
+                code_gen_->pop(eax);
+                code_gen_->add(esp, 4);
+                code_gen_->pop(edx);
+                code_gen_->push(eax);
+                code_gen_->push(edx);
+            }
+            else
+            {
+                code_gen_->add(esp, 4);
+            }
+
             code_gen_->ret();
         }
         else

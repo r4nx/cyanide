@@ -1,8 +1,10 @@
 #ifndef CYANIDE_FUNCTION_TRAITS_HPP_
 #define CYANIDE_FUNCTION_TRAITS_HPP_
 
+#include <functional> // std::function
 #include <tuple>
 #include <type_traits>
+#include <utility> // std::declval
 
 namespace cyanide::types {
 
@@ -63,6 +65,12 @@ struct method_to_func<Ret (Class::*)(Args...)> {
 
 template <typename T>
 using method_to_func_t = typename method_to_func<T>::type;
+
+// ----------------------------------------------------------------------------
+
+template <typename T>
+using result_type_t = typename decltype(std::function{
+    std::declval<T>()})::result_type;
 
 // ----------------------------------------------------------------------------
 
