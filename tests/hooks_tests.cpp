@@ -53,6 +53,12 @@ __declspec(noinline) big_struct __cdecl test_func_b(int a, int b, int c)
     return bs;
 }
 
+__declspec(noinline) void __stdcall test_func_c(int a, int b)
+{
+    static_cast<void>(a);
+    static_cast<void>(b);
+}
+
 TEST_CASE("Unhooked function", "[hooks]")
 {
     constexpr int x               = 3;
@@ -120,13 +126,13 @@ TEST_CASE("Detour hooking the function with large return value", "[hooks]")
     constexpr big_struct expected_result_hooked{10, 20, 30};
 
     {
-        auto callback = [](decltype(&test_func_b) orig, int a, int b, int c) {
-            big_struct bs{10, 20, 30};
+        cyanide::polyhook_x86 wrapper{
+            &test_func_b,
+            [](decltype(&test_func_b) orig, int a, int b, int c) {
+                big_struct bs{10, 20, 30};
 
-            return bs;
-        };
-
-        cyanide::polyhook_x86 wrapper{&test_func_b, std::move(callback)};
+                return bs;
+            }};
 
         wrapper.install();
 
@@ -136,4 +142,14 @@ TEST_CASE("Detour hooking the function with large return value", "[hooks]")
 
     const big_struct actual_result = test_func_b(1, 2, 3);
     REQUIRE(actual_result == expected_result);
+}
+
+TEST_CASE("Detour hooking the function returning void", "[hooks]")
+{
+    cyanide::polyhook_x86 wrapper{&test_func_c, [](int a, int b) {
+                                      static_cast<void>(a);
+                                      static_cast<void>(b);
+                                  }};
+
+    wrapper.install();
 }

@@ -151,7 +151,8 @@ protected:
 
         // Is the return value passed as hidden out parameter instead of being
         // returned through registers
-        constexpr bool hidden_param_return = sizeof(result_type_t<SourceT>) > 8;
+        constexpr bool hidden_param_return =
+            get_type_size<result_type_t<SourceT>>() > 8;
 
         code_gen_->reset();
 
