@@ -37,8 +37,7 @@ namespace types {
 template <
     cyanide::types::HookConcept HookT,
     cyanide::types::FunctionPtr SourceT,
-    typename CallbackT,
-    typename... HookArgs>
+    typename CallbackT>
 class hook_wrapper {
     using this_t = hook_wrapper<HookT, SourceT, CallbackT>;
 
@@ -49,6 +48,7 @@ class hook_wrapper {
         std::negation<std::is_copy_constructible<CallbackT>>>;
 
 public:
+    template <typename... HookArgs>
     hook_wrapper(SourceT source, CallbackT callback, HookArgs &&...hook_args)
         : source_{reinterpret_cast<cyanide::byte_t *>(source)},
           callback_{std::move(callback)}
