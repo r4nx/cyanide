@@ -54,11 +54,23 @@ template <typename... Args>
 class polyhook_x86
     : public hook_wrapper<polyhook_implementation<PLH::x86Detour>, Args...> {
 public:
+    /*
+     * Note that Args &&... here is not a forwarding reference but an rvalue,
+     * because of class template instead of constructor template. To enable
+     * forwarding reference the deduction guide below the class definition is
+     * used.
+     *
+     * https://stackoverflow.com/a/64262244
+     * https://en.cppreference.com/w/cpp/language/class_template_argument_deduction
+     */
     polyhook_x86(Args &&...args)
         : hook_wrapper<polyhook_implementation<PLH::x86Detour>, Args...>{
             std::forward<Args>(args)...}
     {}
 };
+
+template <typename... Args>
+polyhook_x86(Args &&...) -> polyhook_x86<Args...>;
 
 } // namespace cyanide
 
