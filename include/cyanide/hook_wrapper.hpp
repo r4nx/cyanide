@@ -43,10 +43,6 @@ class hook_wrapper {
 
     friend struct cyanide::detail::relay<this_t, SourceT>;
 
-    static constexpr bool move_only_callback = std::conjunction_v<
-        std::is_move_constructible<CallbackT>,
-        std::negation<std::is_copy_constructible<CallbackT>>>;
-
 public:
     template <typename... HookArgs>
     hook_wrapper(SourceT source, CallbackT callback, HookArgs &&...hook_args)
@@ -130,14 +126,12 @@ protected:
      * must be envolved. To use them, we simulate the std::function
      * initialization and retrieve the result type.
      *
+     * Currently, only the second one is used due to issues with function
+     * decomposing.
+     *
      * https://stackoverflow.com/a/53673648
      */
-    std::conditional_t<
-        move_only_callback,
-        std::move_only_function<typename cyanide::types::function_decompose<
-            std::remove_reference_t<CallbackT>>::signature>,
-        decltype(std::function{std::declval<CallbackT>()})>
-        callback_;
+    decltype(std::function{std::declval<CallbackT>()}) callback_;
 
     std::unique_ptr<HookT>                hook_impl_;
     std::unique_ptr<Xbyak::CodeGenerator> code_gen_;
@@ -252,24 +246,6 @@ protected:
     static Ret callback_dispatcher(
         SourceT                      source,
         std::function<Ret(Args...)> &callback,
-        Args &&...args)
-    {
-        return callback(std::forward<Args>(args)...);
-    }
-
-    template <typename Ret, typename... Args>
-    static Ret callback_dispatcher(
-        SourceT                                         source,
-        std::move_only_function<Ret(SourceT, Args...)> &callback,
-        Args &&...args)
-    {
-        return callback(source, std::forward<Args>(args)...);
-    }
-
-    template <typename Ret, typename... Args>
-    static Ret callback_dispatcher(
-        SourceT                                source,
-        std::move_only_function<Ret(Args...)> &callback,
         Args &&...args)
     {
         return callback(std::forward<Args>(args)...);
