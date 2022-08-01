@@ -36,7 +36,7 @@ namespace types {
 
 template <
     cyanide::types::HookConcept HookT,
-    cyanide::types::FunctionPtr SourceT,
+    typename SourceT,
     typename CallbackT>
 class hook_wrapper {
     using this_t = hook_wrapper<HookT, SourceT, CallbackT>;
