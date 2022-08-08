@@ -109,6 +109,16 @@ public:
         hook_impl_->install(source_, relay_jump_);
     }
 
+    void uninstall()
+    {
+        hook_impl_->uninstall();
+    }
+
+    void *get_trampoline()
+    {
+        return hook_impl_->get_trampoline();
+    }
+
 protected:
     cyanide::byte_t       *source_     = nullptr;
     const cyanide::byte_t *relay_jump_ = nullptr;
