@@ -74,6 +74,8 @@ using result_type_t = typename decltype(std::function{
 
 // ----------------------------------------------------------------------------
 
+// https://github.com/allwanttokissme/Yet-another-hook-library/blob/7b01b8d8a8473ae49713d7a9663b70baae50dcce/hook_function_traits.hpp#L146
+// https://stackoverflow.com/q/65722989/8289462
 template <typename>
 struct function_decompose {};
 
