@@ -31,4 +31,5 @@ endif()
 
 target_sources(cyanide PRIVATE
 	"main.cpp"
+	"memory_protection.cpp"
 )
