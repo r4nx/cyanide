@@ -9,6 +9,7 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(cyanide_tests
     "hooks_tests.cpp"
+    "patches_tests.cpp"
 )
 
 target_compile_features(cyanide_tests PRIVATE cxx_std_20)
