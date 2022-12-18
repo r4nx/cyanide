@@ -8,9 +8,7 @@
 #include <array>
 #include <concepts> // std::convertible_to
 #include <cstddef>
-#include <cstring>    // std::memcpy
-#include <functional> // std::invoke
-#include <iterator>   // std::back_inserter
+#include <cstring> // std::memcpy
 #include <optional>
 #include <span>
 #include <utility> // std::exchange, std::forward, std::move, std::swap
@@ -18,8 +16,24 @@
 
 namespace cyanide {
 
-template <template <typename...> typename Container = std::vector>
-class patch {
+namespace detail {
+    class patch_vector_storage;
+} // namespace detail
+
+/*
+ * If you want to provide your own implementation of patch storage, it must have
+ * the following traits:
+ *
+ * void store(std::span<const cyanide::byte_t>);
+ * void restore(void *address);
+ *
+ * The first one to save the original bytes somewhere (it's up to you to decide
+ * how to do it), and the second one to copy previously stored bytes to
+ * destination address specified in the parameter.
+ */
+
+template <typename Storage = cyanide::detail::patch_vector_storage>
+class patch : protected Storage {
 public:
     patch(
         void                            *address,
@@ -34,15 +48,53 @@ public:
     patch(patch &&other) noexcept;
     patch &operator=(patch &&other) noexcept;
 
-    friend void swap(patch &lhs, patch &rhs);
+    /*
+     * See https://stackoverflow.com/a/35890646 for why <> is needed here.
+     *
+     * TL;DR - Without <> we're friending some specific non-template function,
+     * i.e. if Storage is patch_vector_storage, the linker will search for
+     * pretty concrete function - patch<patch_vector_storage>::swap and won't
+     * consider the template function.
+     *
+     * For this reason we use <> to friend a template function.
+     */
+    friend void swap<>(patch<Storage> &lhs, patch<Storage> &rhs);
 
 protected:
-    void                      *address_ = nullptr;
-    Container<cyanide::byte_t> original_bytes_{};
-    bool                       unprotect_ = false;
+    void       *address_    = nullptr;
+    std::size_t patch_size_ = 0;
+    bool        unprotect_  = false;
 };
 
 namespace detail {
+    class patch_vector_storage {
+    protected:
+        void store(std::span<const cyanide::byte_t> original_bytes)
+        {
+            original_bytes_.assign(
+                original_bytes.begin(),
+                original_bytes.end());
+        }
+
+        void restore(void *address)
+        {
+            std::memcpy(
+                address,
+                original_bytes_.data(),
+                original_bytes_.size());
+        }
+
+        friend void swap(patch_vector_storage &lhs, patch_vector_storage &rhs)
+        {
+            using std::swap;
+
+            swap(lhs.original_bytes_, rhs.original_bytes_);
+        }
+
+    private:
+        std::vector<cyanide::byte_t> original_bytes_;
+    };
+
     // https://stackoverflow.com/a/11377375/8289462
     template <std::size_t N>
     struct array_size_binder {
@@ -57,12 +109,6 @@ namespace detail {
         { t } -> std::convertible_to<cyanide::byte_t>;
     };
     // clang-format on
-
-    template <typename T>
-    concept already_allocated = requires(T t)
-    {
-        requires t.size() > 0;
-    };
 } // namespace detail
 
 /*
@@ -93,12 +139,13 @@ auto make_static_patch(void *address, T &&...patch_bytes)
  * Implementation
  ***********************************************/
 
-template <template <typename...> typename Container>
-patch<Container>::patch(
+template <typename Storage>
+patch<Storage>::patch(
     void                            *address,
     std::span<const cyanide::byte_t> patch_bytes,
     bool                             unprotect)
     : address_{address},
+      patch_size_{patch_bytes.size()},
       unprotect_{unprotect}
 {
     // Optionally unprotect the specified memory region till the end of the
@@ -108,56 +155,41 @@ patch<Container>::patch(
     if (unprotect_)
         protection.emplace(
             address_,
-            patch_bytes.size(),
+            patch_size_,
             cyanide::protection_type::read_write);
 
     // Save the original bytes
-
-    // https://stackoverflow.com/a/72423554
-    // https://www.cppstories.com/2016/11/iife-for-complex-initialization/
-    const auto orig_bytes_it = std::invoke([&] {
-        if constexpr (cyanide::detail::already_allocated<
-                          decltype(original_bytes_)>)
-            return original_bytes_.begin();
-        else
-            return std::back_inserter(original_bytes_);
-    });
-
-    std::copy_n(
-        static_cast<cyanide::byte_t *>(address),
-        patch_bytes.size(),
-        orig_bytes_it);
+    Storage::store(
+        std::span{static_cast<const cyanide::byte_t *>(address_), patch_size_});
 
     // Apply the patch
-    std::memcpy(address, patch_bytes.data(), patch_bytes.size());
+    std::memcpy(address, patch_bytes.data(), patch_size_);
 }
 
-template <template <typename...> typename Container>
-patch<Container>::~patch()
+template <typename Storage>
+patch<Storage>::~patch()
 {
     std::optional<cyanide::memory_protection> protection;
 
     if (unprotect_)
-        protection.emplace(
-            address_,
-            original_bytes_.size(),
-            protection_type::read_write);
+        protection.emplace(address_, patch_size_, protection_type::read_write);
 
     // Undo the patch
-    std::memcpy(address_, original_bytes_.data(), original_bytes_.size());
+    Storage::restore(address_);
 }
 
-template <template <typename...> typename Container>
-patch<Container>::patch(patch &&other) noexcept
-    : address_{std::exchange(other.address_, nullptr)},
-      original_bytes_{std::move(other.original_bytes_)},
+template <typename Storage>
+patch<Storage>::patch(patch &&other) noexcept
+    : Storage{std::move(other)},
+      address_{std::exchange(other.address_, nullptr)},
+      patch_size_{std::exchange(other.patch_size_, 0)},
       unprotect_{std::exchange(other.unprotect_, false)}
 {}
 
-template <template <typename...> typename Container>
-patch<Container> &patch<Container>::operator=(patch &&other) noexcept
+template <typename Storage>
+patch<Storage> &patch<Storage>::operator=(patch &&other) noexcept
 {
-    patch<Container> tmp{std::move(other)};
+    patch<Storage> tmp{std::move(other)};
 
     using std::swap;
     swap(tmp, *this);
@@ -165,13 +197,15 @@ patch<Container> &patch<Container>::operator=(patch &&other) noexcept
     return *this;
 }
 
-template <template <typename...> typename Container>
-void swap(patch<Container> &lhs, patch<Container> &rhs)
+template <typename Storage>
+void swap(patch<Storage> &lhs, patch<Storage> &rhs)
 {
     using std::swap;
 
+    swap(static_cast<Storage &>(lhs), static_cast<Storage &>(rhs));
+
     swap(lhs.address_, rhs.address_);
-    swap(lhs.original_bytes_, rhs.original_bytes_);
+    swap(lhs.patch_size_, rhs.patch_size_);
     swap(lhs.unprotect_, rhs.unprotect_);
 }
 
