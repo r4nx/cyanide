@@ -11,6 +11,7 @@
 #include <cstring> // std::memcpy
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <utility> // std::exchange, std::forward, std::move, std::swap
 #include <vector>
 
@@ -95,11 +96,40 @@ namespace detail {
         std::vector<cyanide::byte_t> original_bytes_;
     };
 
-    // https://stackoverflow.com/a/11377375/8289462
     template <std::size_t N>
-    struct array_size_binder {
-        template <typename T>
-        struct type : public std::array<T, N> {};
+    class patch_array_storage {
+    protected:
+        void store(std::span<const cyanide::byte_t> original_bytes)
+        {
+            if (original_bytes.size() != original_bytes_.size())
+            {
+                throw std::out_of_range{
+                    "Usage of array storage of inappropriate size"};
+            }
+
+            std::copy(
+                original_bytes.begin(),
+                original_bytes.end(),
+                original_bytes_.begin());
+        }
+
+        void restore(void *address)
+        {
+            std::memcpy(
+                address,
+                original_bytes_.data(),
+                original_bytes_.size());
+        }
+
+        friend void swap(patch_array_storage &lhs, patch_array_storage &rhs)
+        {
+            using std::swap;
+
+            swap(lhs.original_bytes_, rhs.original_bytes_);
+        }
+
+    private:
+        std::array<cyanide::byte_t, N> original_bytes_{};
     };
 
     template <typename T>
@@ -109,30 +139,51 @@ namespace detail {
         { t } -> std::convertible_to<cyanide::byte_t>;
     };
     // clang-format on
+
+    template <typename Storage, cyanide::detail::byte_concept... T>
+    auto make_patch_impl(void *address, T &&...patch_bytes)
+    {
+        static_assert(sizeof...(T) > 0, "Patch bytes have not been specified");
+
+        const std::array<cyanide::byte_t, sizeof...(T)> patch_arr{
+            static_cast<cyanide::byte_t>(std::forward<T>(patch_bytes))...};
+
+        return patch<Storage>{address, patch_arr};
+    }
 } // namespace detail
+
+/*
+ * byte_concept is required to ensure that all the passed arguments are indeed
+ * bytes. You can't pass any other parameters via the parameter pack as its used
+ * to calculate the array size.
+ */
+
+/*
+ * Construct a patch that stores the original bytes on heap using @p std::vector
+ *
+ * @param address Patch address.
+ * @param patch_bytes Bytes to replace with (contents of the patch).
+ */
+template <cyanide::detail::byte_concept... T>
+auto make_dynamic_patch(void *address, T &&...patch_bytes)
+{
+    return cyanide::detail::make_patch_impl<
+        cyanide::detail::patch_vector_storage,
+        T...>(address, std::forward<T>(patch_bytes)...);
+}
 
 /*
  * Construct a patch that stores the original bytes on stack using @p std::array
  *
  * @param address Patch address.
  * @param patch_bytes Bytes to replace with (contents of the patch).
- *
- * byte_concept is required to ensure that all the passed arguments are indeed
- * bytes. You can't pass any other parameters via the parameter pack as its used
- * to calculate the array size.
  */
 template <cyanide::detail::byte_concept... T>
 auto make_static_patch(void *address, T &&...patch_bytes)
 {
-    static_assert(sizeof...(T) > 0, "Patch bytes have not been specified");
-
-    const std::array<cyanide::byte_t, sizeof...(T)> patch_arr{
-        static_cast<cyanide::byte_t>(std::forward<T>(patch_bytes))...};
-
-    return patch<
-        typename cyanide::detail::array_size_binder<sizeof...(T)>::type>{
-        address,
-        patch_arr};
+    return cyanide::detail::make_patch_impl<
+        cyanide::detail::patch_array_storage<sizeof...(T)>,
+        T...>(address, std::forward<T>(patch_bytes)...);
 }
 
 /************************************************
@@ -180,7 +231,9 @@ patch<Storage>::~patch()
 
 template <typename Storage>
 patch<Storage>::patch(patch &&other) noexcept
-    : Storage{std::move(other)},
+    : Storage{std::move(other)}, // <- This doesn't cause slicing, we're just
+                                 // moving the base part of the class -
+                                 // https://stackoverflow.com/a/22977905/8289462
       address_{std::exchange(other.address_, nullptr)},
       patch_size_{std::exchange(other.patch_size_, 0)},
       unprotect_{std::exchange(other.unprotect_, false)}
