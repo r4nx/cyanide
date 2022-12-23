@@ -27,7 +27,7 @@ if(CYANIDE_INSTALL)
 
     install(
         TARGETS cyanide
-        EXPORT ${PROJECT_NAME}Targets
+        EXPORT ${PROJECT_NAME}-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -35,12 +35,12 @@ if(CYANIDE_INSTALL)
     )
     install(DIRECTORY include/cyanide DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-    set(config_file ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake)
-    set(version_file ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
+    set(config_file ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake)
+    set(version_file ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake)
     set(config_install_destination lib/cmake/${PROJECT_NAME})
 
     configure_package_config_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.cmake.in
         ${config_file}
         INSTALL_DESTINATION ${config_install_destination}
     )
@@ -56,7 +56,7 @@ if(CYANIDE_INSTALL)
     )
 
     install(
-        EXPORT ${PROJECT_NAME}Targets
+        EXPORT ${PROJECT_NAME}-targets
         NAMESPACE ${PROJECT_NAME}::
         DESTINATION ${config_install_destination}
     )
