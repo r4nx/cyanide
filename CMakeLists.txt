@@ -39,10 +39,16 @@ if(CYANIDE_INSTALL)
     set(version_file ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake)
     set(config_install_destination lib/cmake/${PROJECT_NAME})
 
+    set(XBYAK_CONFIG_DIR "lib/cmake/xbyak")
+    set(POLYHOOK_CONFIG_DIR "lib/PolyHook_2")
+
     configure_package_config_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.cmake.in
         ${config_file}
         INSTALL_DESTINATION ${config_install_destination}
+        PATH_VARS
+            XBYAK_CONFIG_DIR
+            POLYHOOK_CONFIG_DIR
     )
 
     write_basic_package_version_file(
